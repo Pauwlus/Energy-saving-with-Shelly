@@ -1,4 +1,6 @@
-# Smart and cheap heating with Shelly
+# Use energy smartly and cheaply with Shelly
+
+Just forked, still working on it
 
 - [Smart and cheap heating with Shelly](#smart-and-cheap-heating-with-shelly)
   - [Script Overview](#script-overview)
