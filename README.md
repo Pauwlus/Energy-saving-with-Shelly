@@ -1,6 +1,6 @@
 # Use energy smartly and cheaply with Shelly
 
-Just forked, still working on it
+Just forked, just start working on it
 
 - [Smart and cheap heating with Shelly](#smart-and-cheap-heating-with-shelly)
   - [Script Overview](#script-overview)
