@@ -1,8 +1,6 @@
 # Use energy smartly and cheaply with Shelly
+- Just forked, just start working on it
 - I will only wil use the HEAT_LOWPRICE part, and make it suitable for the EnergyZero API
-
-Just forked, just start working on it
-===========
 
 - [Smart and cheap heating with Shelly](#smart-and-cheap-heating-with-shelly)
   - [Script Overview](#script-overview)
