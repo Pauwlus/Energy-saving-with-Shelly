@@ -19,8 +19,8 @@ let CONFIG = {
     Kockengen: 250595,
   },
   //check every 60 seconds
-  checkInterval: 60 * 60 * 1000,
-  maxPrice: 0.07
+  checkInterval: 24 * 60 * 60 * 1000,
+  maxPrice: 0.08
 };
 
 //ON/OFF strings, to create Cron based time settings
@@ -28,10 +28,28 @@ let CONFIG = {
 
 let hoursON = "";
 let hoursOFF = "";
+let daysON = "";
+let daysOFF = "";
+let weekDays = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
+
+
 
 /////////////////////////////////////////////////////////
 // *** Functions ***
 /////////////////////////////////////////////////////////
+
+//Concat days
+
+function AddWeekDays(currentString, weekDaynumber)
+{
+  if (currentString.length > 0) { currentString = currentString + ","};
+  
+  return (
+    // currentString + CONFIG.weekDays(weekDaynumber)
+    currentString + weekDays[weekDaynumber]
+  );
+}
+
 
 //Concat EnergyZero URL
 function getMyEnergyURL(maxPrice) {
@@ -61,7 +79,7 @@ function CreateSchedule(sID,hoursString,switchValue) {
  
         {
           "id": sID,
-          "enable": true,
+          "enable": switchValue,
           "timespec": hoursString,
           "calls": [
               {
@@ -89,6 +107,8 @@ function processHttpResponse(response,error_code,error_message,data) {
   //set hour strings//
   let hoursON = "";
   let hoursOFF = "";
+  let daysON = "";
+  let daysOFF = "";
 
   //Cleanup old schedules
   Shelly.call("Schedule.DeleteAll");
@@ -102,6 +122,7 @@ function processHttpResponse(response,error_code,error_message,data) {
     // proces result
     let energyData = JSON.parse(response.body);
 
+
       for (let i = 0; i < energyData.Prices.length; i++) {
 
         if (energyData.Prices[i].price <= CONFIG.maxPrice) {
@@ -113,7 +134,9 @@ function processHttpResponse(response,error_code,error_message,data) {
         }
 
       }
-    
+    let now = new Date();
+    //let daysON = AddWeekDays(daysON,now.getDay)
+    let daysON = AddWeekDays(daysON,now.getDay())
 
     //End-up hours string with all day,week, etc. according Cron-format
     let hoursON = "0 0 " + hoursON + " * * SUN,MON,TUE,WED,THU,FRI,SAT"
@@ -122,22 +145,19 @@ function processHttpResponse(response,error_code,error_message,data) {
     // Hours strings are concatenated, so lets create the schedules 
     CreateSchedule(1, hoursON,true);
     CreateSchedule(2, hoursOFF,false);
-    
+ 
+    console.log("Switch-on hours: " + hoursON);
+    console.log("Switch-off hours: " + hoursOFF);
+    console.log("DaysON: " + daysON)
+
   }
 }
 
 
-function EnergyPriceControlMaxPrice(maxPrice2) {
-//  print(
-//    CONFIG.energyzeroEndpoint,
-//    " MaxPrice - ",
-//    CONFIG.maxPrice,
-//    " euro",
-//    maxPrice2,
-//    " euro"
-//  );
+function EnergyPriceControlMaxPrice() {
 
-  Shelly.call("http.get", { url: getMyEnergyURL(0.08) },processHttpResponse);
+  Shelly.call("http.get", { url: getMyEnergyURL(CONFIG.maxPrice) },processHttpResponse);
+ 
 
 }
 
@@ -153,6 +173,5 @@ function EnergyPriceControlMaxPrice(maxPrice2) {
 
 
 EnergyPriceControlMaxPrice(CONFIG.maxPrice);
-console.log("Switch-on hours: " + hoursON);
-console.log("Switch-off hours: " + hoursOFF);
+
 
