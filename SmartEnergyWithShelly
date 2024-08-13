@@ -1,0 +1,158 @@
+// Copyright Paul den Boer
+//
+// Shelly Script example: Turn on when price is below or equals CONFIG.maxPrice
+// Turn off when price is above CONFIG.maxPrice
+// For getting an API-KEY from Accuweather follow the instructions on their site
+// for registering a new application, copy the key and paste it here
+
+/////////////////////////////////////////////////////////
+// *** Intitalize variabels ***
+/////////////////////////////////////////////////////////
+let CONFIG = {
+  energyzeroEndpoint:
+    "https://api.energyzero.nl/v1/energyprices",
+  locations: {
+    Sofia: 51097,
+    Chicago: 348308,
+    Miami: 347936,
+    Mosfellsbaer: 190395,
+    Kockengen: 250595,
+  },
+  //check every 60 seconds
+  checkInterval: 60 * 60 * 1000,
+  maxPrice: 0.07
+};
+
+//ON/OFF strings, to create Cron based time settings
+//https://github.com/mongoose-os-libs/cron
+
+let hoursON = "";
+let hoursOFF = "";
+
+/////////////////////////////////////////////////////////
+// *** Functions ***
+/////////////////////////////////////////////////////////
+
+//Concat EnergyZero URL
+function getMyEnergyURL(maxPrice) {
+
+
+  // ff een tesst
+  let now = new Date();
+  let day = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 5 = Friday, 6 = Saturday
+  let hour = now.getHours();
+  let year = now.getFullYear();
+  let month = now.getMonth()+1;
+  let minute = now.getMinutes();
+  let monthday = now.getDate();
+  let currentTime = (day * 24 * 60) + (hour * 60) + minute;
+  
+
+  return (
+    CONFIG.energyzeroEndpoint +
+    "?fromDate="+year+"-" + month + "-" + monthday + "T00:00:01Z&tillDate="+ year + "-" + month + "-" + monthday + "T23:00:00Z" +
+    "&interval=4&usageType=1&inclBtw=false"
+  );
+}
+
+//Create new schedule, bases on concatenated hours
+function CreateSchedule(sID,hoursString,switchValue) {
+   Shelly.call("Schedule.Create",
+ 
+        {
+          "id": sID,
+          "enable": true,
+          "timespec": hoursString,
+          "calls": [
+              {
+                  "method": "switch.set",
+                  "params": {
+                      "id": 0,
+                      "on": true
+                  }
+              }
+          ]
+      }
+
+   );
+   
+  console.log("hoursString: " + hoursString + " switchValue: ",switchValue);
+  console.log("Schedule created");
+ 
+ }
+
+// Get energy data and create scheduler
+// - Determine and contactenate ON/OFF hours based on energy price
+// - Create schedulers; these functions are part off this function, because they have to wait on the results of the first step
+function processHttpResponse(response,error_code,error_message,data) {
+
+  //set hour strings//
+  let hoursON = "";
+  let hoursOFF = "";
+
+  //Cleanup old schedules
+  Shelly.call("Schedule.DeleteAll");
+  console.log("All old schedules deleted");
+
+
+  if (error_code != 0) {
+     // process error
+     console.log("Error reading energiedata: ", error_message);
+  } else {
+    // proces result
+    let energyData = JSON.parse(response.body);
+
+      for (let i = 0; i < energyData.Prices.length; i++) {
+
+        if (energyData.Prices[i].price <= CONFIG.maxPrice) {
+          if(hoursON.length > 0) {hoursON = hoursON + ","}
+          let hoursON = hoursON + i;
+        } else {
+          if(hoursOFF.length > 0) {hoursOFF= hoursOFF+ ","}
+          let hoursOFF = hoursOFF + i;
+        }
+
+      }
+    
+
+    //End-up hours string with all day,week, etc. according Cron-format
+    let hoursON = "0 0 " + hoursON + " * * SUN,MON,TUE,WED,THU,FRI,SAT"
+    let hoursOFF = "0 0 " + hoursOFF + " * * SUN,MON,TUE,WED,THU,FRI,SAT"
+
+    // Hours strings are concatenated, so lets create the schedules 
+    CreateSchedule(1, hoursON,true);
+    CreateSchedule(2, hoursOFF,false);
+    
+  }
+}
+
+
+function EnergyPriceControlMaxPrice(maxPrice2) {
+//  print(
+//    CONFIG.energyzeroEndpoint,
+//    " MaxPrice - ",
+//    CONFIG.maxPrice,
+//    " euro",
+//    maxPrice2,
+//    " euro"
+//  );
+
+  Shelly.call("http.get", { url: getMyEnergyURL(0.08) },processHttpResponse);
+
+}
+
+
+
+
+
+////////////////////////////////////////////////////
+// main script
+//
+
+//Timer.set(CONFIG.checkInterval, true, FireOnTimeInterval);
+
+
+EnergyPriceControlMaxPrice(CONFIG.maxPrice);
+console.log("Switch-on hours: " + hoursON);
+console.log("Switch-off hours: " + hoursOFF);
+
