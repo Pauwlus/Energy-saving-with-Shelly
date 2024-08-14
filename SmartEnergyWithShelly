@@ -79,14 +79,14 @@ function CreateSchedule(sID,hoursString,switchValue) {
  
         {
           "id": sID,
-          "enable": switchValue,
+          "enable": true,
           "timespec": hoursString,
           "calls": [
               {
                   "method": "switch.set",
                   "params": {
                       "id": 0,
-                      "on": true
+                      "on": switchValue
                   }
               }
           ]
