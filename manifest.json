@@ -1,7 +1,7 @@
 [
     {
     "fname": "SmartEnergyWithShelly.js",
-    "title": "Test van energy save",
+    "title": "Shelly script to use energy smarter",
     "description": "This Shelly script is designed to retrieve energy market prices from EnergyZero and activate device on minimum price."
     }
 ]
