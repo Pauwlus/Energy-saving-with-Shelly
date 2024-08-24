@@ -9,17 +9,9 @@
 // *** Intitalize variabels ***
 /////////////////////////////////////////////////////////
 let CONFIG = {
-  energyzeroEndpoint:
-    "https://api.energyzero.nl/v1/energyprices",
-  locations: {
-    Sofia: 51097,
-    Chicago: 348308,
-    Miami: 347936,
-    Mosfellsbaer: 190395,
-    Kockengen: 250595,
-  },
+  energyzeroEndpoint: "https://api.energyzero.nl/v1/energyprices",
   //check every 60 seconds
-  checkInterval: 24 * 60 * 60 * 1000,
+  checkInterval: 12 * 60 * 60 * 1000,
   maxPrice: 0.08
 };
 
@@ -30,6 +22,7 @@ let hoursON = "";
 let hoursOFF = "";
 let daysON = "";
 let daysOFF = "";
+let readingDateWeekDay = 0
 let weekDays = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
 
 
@@ -38,47 +31,55 @@ let weekDays = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
 // *** Functions ***
 /////////////////////////////////////////////////////////
 
-//Concat days
-
-function AddWeekDays(currentString, weekDaynumber)
+//Concat numberstring with comma separator
+function AddNumber(currentString, element)
 {
   if (currentString.length > 0) { currentString = currentString + ","};
-  
-  return (
-    // currentString + CONFIG.weekDays(weekDaynumber)
-    currentString + weekDays[weekDaynumber]
-  );
+  return (currentString + element);
 }
 
 
 //Concat EnergyZero URL
 function getMyEnergyURL(maxPrice) {
 
+  // declare and initialize
+  let currentday = new Date();
+  let nextday = new Date();
 
-  // ff een tesst
-  let now = new Date();
-  let day = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 5 = Friday, 6 = Saturday
-  let hour = now.getHours();
-  let year = now.getFullYear();
-  let month = now.getMonth()+1;
-  let minute = now.getMinutes();
-  let monthday = now.getDate();
-  let currentTime = (day * 24 * 60) + (hour * 60) + minute;
-  
+  //Add 24h to currentday
+  nextday.setTime(currentday.getTime() + (24 * 60 * 60 * 1000));
+
+  console.log("nextday:",nextday.getDate());
+
+  //time range of next 48 hours
+  let fromDate = new Date(currentday.getFullYear(),currentday.getMonth(),currentday.getDate(),0,0,0);
+  //let toDate = new Date(nextday.getFullYear(),nextday.getMonth(),nextday.getDate(),23,0,0);
+  let toDate = new Date(currentday.getFullYear(),currentday.getMonth(),currentday.getDate(),23,0,0);
 
   return (
     CONFIG.energyzeroEndpoint +
-    "?fromDate="+year+"-" + month + "-" + monthday + "T00:00:01Z&tillDate="+ year + "-" + month + "-" + monthday + "T23:00:00Z" +
+    "?fromDate=" + 
+    fromDate.toISOString() +
+//    year + "-" + 
+//    month + "-" + 
+//    monthday + 
+//    "T00:00:00Z"+
+    "&tillDate=" +
+    toDate.toISOString() +
+ //   year + "-" + 
+//    month + "-" + 
+//    monthday + 
+//    "T23:00:00Z" +
     "&interval=4&usageType=1&inclBtw=false"
   );
 }
 
-//Create new schedule, bases on concatenated hours
+//Create new schedule scheme, bases on concatenated hours
 function CreateSchedule(sID,hoursString,switchValue) {
    Shelly.call("Schedule.Create",
  
         {
-          "id": sID,
+//          "id": sID, // create own schedule_ID
           "enable": true,
           "timespec": hoursString,
           "calls": [
@@ -94,8 +95,9 @@ function CreateSchedule(sID,hoursString,switchValue) {
 
    );
    
-  console.log("hoursString: " + hoursString + " switchValue: ",switchValue);
-  console.log("Schedule created");
+  console.log("*Schedule created*" );
+  console.log("- Schedule   : " + hoursString);
+  console.log("- SwitchValue: ", switchValue);
  
  }
 
@@ -108,7 +110,11 @@ function processHttpResponse(response,error_code,error_message,data) {
   let hoursON = "";
   let hoursOFF = "";
   let daysON = "";
-  let daysOFF = "";
+  let readingDateWeekDay = 0;
+  let readingDateString = "";
+  let readingDateHour = 0;
+  let previousDate = new Date()
+
 
   //Cleanup old schedules
   Shelly.call("Schedule.DeleteAll");
@@ -125,30 +131,54 @@ function processHttpResponse(response,error_code,error_message,data) {
 
       for (let i = 0; i < energyData.Prices.length; i++) {
 
-        if (energyData.Prices[i].price <= CONFIG.maxPrice) {
-          if(hoursON.length > 0) {hoursON = hoursON + ","}
-          let hoursON = hoursON + i;
-        } else {
-          if(hoursOFF.length > 0) {hoursOFF= hoursOFF+ ","}
-          let hoursOFF = hoursOFF + i;
+        let readingDateString = energyData.Prices[i].readingDate;
+        
+        let readingDate = new Date(readingDateString)
+
+        //check is day flips
+        if (readingDate.getDay() !== previousDate.getDay() ) {
+
+        //   //Create schedule and initialize
+
+        //   // Fetch the days on
+        //   let daysON = AddNumber(daysON,readingDate.getDay());
+
+        //   let hoursON  = "0 0 " + hoursON  + " * * " + daysON;
+        //   let hoursOFF = "0 0 " + hoursOFF + " * * " + daysON;
+
+        //   CreateSchedule(1, hoursON,true);
+        //   CreateSchedule(2, hoursOFF,false);
+
+        //   let hoursON = "";
+        //   let hoursOFF = "";
+
         }
 
+        if (energyData.Prices[i].price <= CONFIG.maxPrice) {
+ //         let hoursON = AddNumber(hoursON,i);
+          let hoursON = AddNumber(hoursON,readingDate.getHours());
+
+        } else {
+//          let hoursOFF = AddNumber(hoursOFF,i);
+          let hoursOFF = AddNumber(hoursOFF,readingDate.getHours());
+          
+        }
+        
+        //preserve date to check day flip
+        let previousDate = readingDate
+ 
       }
-    let now = new Date();
-    //let daysON = AddWeekDays(daysON,now.getDay)
-    let daysON = AddWeekDays(daysON,now.getDay())
+
+    // Fetch the days on
+    let daysON = AddNumber(daysON,readingDate.getDay());
+
 
     //End-up hours string with all day,week, etc. according Cron-format
-    let hoursON = "0 0 " + hoursON + " * * SUN,MON,TUE,WED,THU,FRI,SAT"
-    let hoursOFF = "0 0 " + hoursOFF + " * * SUN,MON,TUE,WED,THU,FRI,SAT"
+    let hoursON  = "0 0 " + hoursON  + " * * " + daysON;
+    let hoursOFF = "0 0 " + hoursOFF + " * * " + daysON;
 
-    // Hours strings are concatenated, so lets create the schedules 
     CreateSchedule(1, hoursON,true);
     CreateSchedule(2, hoursOFF,false);
- 
-    console.log("Switch-on hours: " + hoursON);
-    console.log("Switch-off hours: " + hoursOFF);
-    console.log("DaysON: " + daysON)
 
   }
 }
@@ -161,17 +191,10 @@ function EnergyPriceControlMaxPrice() {
 
 }
 
-
-
-
-
 ////////////////////////////////////////////////////
 // main script
 //
 
-//Timer.set(CONFIG.checkInterval, true, FireOnTimeInterval);
+//Timer.set(CONFIG.checkInterval, true, EnergyPriceControlMaxPrice);
 
-
-EnergyPriceControlMaxPrice(CONFIG.maxPrice);
-
-
+EnergyPriceControlMaxPrice();
