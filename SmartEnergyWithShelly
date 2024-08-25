@@ -2,8 +2,6 @@
 //
 // Shelly Script example: Turn on when price is below or equals CONFIG.maxPrice
 // Turn off when price is above CONFIG.maxPrice
-// For getting an API-KEY from Accuweather follow the instructions on their site
-// for registering a new application, copy the key and paste it here
 
 /////////////////////////////////////////////////////////
 // *** Intitalize variabels ***
@@ -17,15 +15,6 @@ let CONFIG = {
 
 //ON/OFF strings, to create Cron based time settings
 //https://github.com/mongoose-os-libs/cron
-
-let hoursON = "";
-let hoursOFF = "";
-let daysON = "";
-let daysOFF = "";
-let readingDateWeekDay = 0
-let weekDays = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
-
-
 
 /////////////////////////////////////////////////////////
 // *** Functions ***
@@ -95,17 +84,13 @@ function CreateSchedule(sID,hoursString, daysString,switchValue) {
  }
 
 // Get energy data and create scheduler
-// - Determine and contactenate ON/OFF hours based on energy price
+// - Determine and contcatenate ON/OFF hours based on energy price
 // - Create schedulers; these functions are part off this function, because they have to wait on the results of the first step
 function processHttpResponse(response,error_code,error_message,data) {
 
   //set hour strings//
   let hoursON = "";
   let hoursOFF = "";
-  let daysON = "";
-  let readingDateWeekDay = 0;
-  let readingDateString = "";
-  let readingDateHour = 0;
   let nextreadingDate = new Date()
 
 
@@ -124,7 +109,7 @@ function processHttpResponse(response,error_code,error_message,data) {
 
       for (let i = 0; i < energyData.Prices.length; i++) {
 
-        let readingDate = new Date(energyData.Prices[i].readingDate)
+        let readingDate = new Date(energyData.Prices[i].readingDate);
 
         if (energyData.Prices[i].price <= CONFIG.maxPrice) {
           let hoursON = AddNumber(hoursON,readingDate.getHours());
@@ -134,9 +119,9 @@ function processHttpResponse(response,error_code,error_message,data) {
           
         }
 
-        if (i < (energyData.Prices.length-2)) {
+        if (i < (energyData.Prices.length-5)) {
           
-          let nextreadingDate = new Date(energyData.Prices[i+1].readingDate)
+          let nextreadingDate = new Date(energyData.Prices[i+1].readingDate);
 
           //it's a 48h energyprice array  
           //check if day flips, then first create schedule and clear hours for next day
@@ -157,6 +142,10 @@ function processHttpResponse(response,error_code,error_message,data) {
     //create schedules
     CreateSchedule(3, hoursON,readingDate.getDay(),true);
     CreateSchedule(4, hoursOFF,readingDate.getDay(),false);
+    let hoursON = "";
+    let hoursOFF = "";
+
+
 
   }
 }
