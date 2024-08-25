@@ -56,6 +56,15 @@ function CreateSchedule(sID,hoursString, daysString,switchValue) {
   //https://github.com/mongoose-os-libs/cron
   //https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Schedule/
 
+  //   Each expression contains 6 fields:
+  // seconds, 0-59
+  // minutes, 0-59
+  // hours, 0-23
+  // day of month, 1-31
+  // month, 1-12 or JAN-DEC
+  // day of week 0-6 or SUN-SAT
+
+
   //Concat timestring with all day,week, etc. according Cron-format
   let timeString = "0 0 " + hoursString  + " * * " + daysString;
 
