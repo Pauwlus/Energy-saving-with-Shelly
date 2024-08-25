@@ -8,13 +8,10 @@
 /////////////////////////////////////////////////////////
 let CONFIG = {
   energyzeroEndpoint: "https://api.energyzero.nl/v1/energyprices",
-  //check every 60 seconds
+  //check 2 times a day (every 12h)
   checkInterval: 12 * 60 * 60 * 1000,
   maxPrice: 0.08
 };
-
-//ON/OFF strings, to create Cron based time settings
-//https://github.com/mongoose-os-libs/cron
 
 /////////////////////////////////////////////////////////
 // *** Functions ***
@@ -54,6 +51,10 @@ function getMyEnergyURL(maxPrice) {
 
 //Create new schedule scheme, based on concatenated hours
 function CreateSchedule(sID,hoursString, daysString,switchValue) {
+
+  //Using cron based time settings
+  //https://github.com/mongoose-os-libs/cron
+  //https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Schedule/
 
   //Concat timestring with all day,week, etc. according Cron-format
   let timeString = "0 0 " + hoursString  + " * * " + daysString;
@@ -162,6 +163,6 @@ function EnergyPriceControlMaxPrice() {
 // main script
 //
 
-//Timer.set(CONFIG.checkInterval, true, EnergyPriceControlMaxPrice);
+Timer.set(CONFIG.checkInterval, true, EnergyPriceControlMaxPrice);
 
-EnergyPriceControlMaxPrice();
+//EnergyPriceControlMaxPrice();
