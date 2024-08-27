@@ -121,7 +121,7 @@ function processHttpResponse(response,error_code,error_message,data) {
   let hoursON = "";
   let hoursOFF = "";
   let nextreadingDate = new Date()
-
+  let scheduleObjectArray = [];
 
   //Cleanup old schedules
   Shelly.call("Schedule.DeleteAll");
@@ -167,7 +167,7 @@ function processHttpResponse(response,error_code,error_message,data) {
 
     }
 
-    //create schedules
+    //Fill schedule array
     CreateScheduleArray(3, hoursON,readingDate.getDay(),true);
     CreateScheduleArray(4, hoursOFF,readingDate.getDay(),false);
     let hoursON = "";
@@ -195,23 +195,3 @@ function EnergyPriceControlMaxPrice() {
 //Timer.set(CONFIG.checkInterval, true, EnergyPriceControlMaxPrice);
 
 EnergyPriceControlMaxPrice();
-
-
-// Shelly.call("Schedule.Create",
- 
-//   {
-//     //"id": sID, // create own schedule_ID
-//     "enable": true,
-//     "timespec": timeString,
-//     "calls": [
-//         {
-//             "method": "switch.set",
-//             "params": {
-//                 "id": 0,
-//                 "on": switchValue
-//             }
-//         }
-//     ]
-// }
-
-// );
