@@ -9,9 +9,12 @@
 let CONFIG = {
   energyzeroEndpoint: "https://api.energyzero.nl/v1/energyprices",
   //check 2 times a day (every 12h)
-  checkInterval: 12 * 60 * 60 * 1000,
+  checkInterval: 6 * 60 * 60 * 1000,
   maxPrice: 0.08
 };
+
+let scheduleObjectArray = [];
+
 
 /////////////////////////////////////////////////////////
 // *** Functions ***
@@ -26,14 +29,16 @@ function AddNumber(currentString, element)
 
 
 //Concat EnergyZero URL
-function getMyEnergyURL(maxPrice) {
+function getMyEnergyURL(daystimerange) {
+  //additional timerange hours
+
 
   // declare and initialize
   let currentday = new Date();
   let nextday = new Date();
 
   //Add 24h to currentday
-  //nextday.setTime(currentday.getTime() + (24 * 60 * 60 * 1000));
+  nextday.setTime(currentday.getTime() + (((daystimerange-1) * 24) * 60 * 60 * 1000));
 
   //time range of next 48 hours
   let fromDate = new Date(currentday.getFullYear(),currentday.getMonth(),currentday.getDate(),0,0,0);
@@ -49,8 +54,8 @@ function getMyEnergyURL(maxPrice) {
   );
 }
 
-//Create new schedule scheme, based on concatenated hours
-function CreateSchedule(sID,hoursString, daysString,switchValue) {
+//Create new schedule scheme, based on concatenated hours and push in an array
+function CreateScheduleArray(sID,hoursString, daysString,switchValue) {
 
   //Using cron based time settings
   //https://github.com/mongoose-os-libs/cron
@@ -67,30 +72,44 @@ function CreateSchedule(sID,hoursString, daysString,switchValue) {
 
   //Concat timestring with all day,week, etc. according Cron-format
   let timeString = "0 0 " + hoursString  + " * * " + daysString;
-
-   Shelly.call("Schedule.Create",
  
+  let scheduleElement = 
+   {
+    //"id": sID, // create own schedule_ID
+    "enable": true,
+    "timespec": timeString,
+    "calls": [
         {
-          "id": sID, // create own schedule_ID
-          "enable": true,
-          "timespec": timeString,
-          "calls": [
-              {
-                  "method": "switch.set",
-                  "params": {
-                      "id": 0,
-                      "on": switchValue
-                  }
-              }
-          ]
-      }
+            "method": "switch.set",
+            "params": {
+                "id": 0,
+                "on": switchValue
+           }
+        }
+      ] 
+    };
 
-   );
-   
+  // build up an array with schedule objects
+  scheduleObjectArray.push(scheduleElement);
+
   console.log("*Schedule created*" );
   console.log("- Schedule   : " + timeString);
   console.log("- SwitchValue: ", switchValue);
  
+ }
+
+  //Recursive function, prevents stacking shelly calls problems
+ function CreateSchedulers() {
+
+  //create scheduler  
+  Shelly.call("Schedule.Create",scheduleObjectArray[0]);
+  scheduleObjectArray.splice(0,1);
+
+  if (scheduleObjectArray.length > 0){
+    Timer.set(1000, false, CreateSchedulers); //recursive to force one by one execution
+  }
+
+
  }
 
 // Get energy data and create scheduler
@@ -115,63 +134,84 @@ function processHttpResponse(response,error_code,error_message,data) {
   } else {
     // proces result
     let energyData = JSON.parse(response.body);
+    
+    // keep date of firste element
+    let startreadingDate = new Date(energyData.Prices[0].readingDate); 
+    
+    for (let i = 0; i < energyData.Prices.length; i++) {
 
+      let readingDate = new Date(energyData.Prices[i].readingDate);
 
-      for (let i = 0; i < energyData.Prices.length; i++) {
+      //it's a 48h energyprice array  
+      //check if day flips, then first create schedule and clear hours for next day
+      if (readingDate.getDate() !== startreadingDate.getDate() ) {
+        CreateScheduleArray(1, hoursON,startreadingDate.getDay(),true);
+        CreateScheduleArray(2, hoursOFF,startreadingDate.getDay(),false);
 
-        let readingDate = new Date(energyData.Prices[i].readingDate);
+        //clear hours for next day
+        let hoursON = "";
+        let hoursOFF = "";
 
-        if (energyData.Prices[i].price <= CONFIG.maxPrice) {
-          let hoursON = AddNumber(hoursON,readingDate.getHours());
+        startreadingDate = readingDate
 
-        } else {
-          let hoursOFF = AddNumber(hoursOFF,readingDate.getHours());
-          
-        }
-
-        if (i < (energyData.Prices.length-5)) {
-          
-          let nextreadingDate = new Date(energyData.Prices[i+1].readingDate);
-
-          //it's a 48h energyprice array  
-          //check if day flips, then first create schedule and clear hours for next day
-          if (readingDate.getDay() !== nextreadingDate.getDay() ) {
-            CreateSchedule(1, hoursON,readingDate.getDay(),true);
-            CreateSchedule(2, hoursOFF,readingDate.getDay(),false);
-
-            //clear hours for next day
-            let hoursON = "";
-            let hoursOFF = "";
-
-          }
-        }
-
- 
       }
 
+      if (energyData.Prices[i].price <= CONFIG.maxPrice) {
+        let hoursON = AddNumber(hoursON,readingDate.getHours());
+
+      } else {
+        let hoursOFF = AddNumber(hoursOFF,readingDate.getHours());
+        
+      }
+
+
+    }
+
     //create schedules
-    CreateSchedule(3, hoursON,readingDate.getDay(),true);
-    CreateSchedule(4, hoursOFF,readingDate.getDay(),false);
+    CreateScheduleArray(3, hoursON,readingDate.getDay(),true);
+    CreateScheduleArray(4, hoursOFF,readingDate.getDay(),false);
     let hoursON = "";
     let hoursOFF = "";
 
-
-
+    CreateSchedulers();
+    
   }
 }
 
 
 function EnergyPriceControlMaxPrice() {
 
-  Shelly.call("http.get", { url: getMyEnergyURL(CONFIG.maxPrice) },processHttpResponse);
- 
+
+  Shelly.call("http.get", { url: getMyEnergyURL(2) },processHttpResponse);
+
 
 }
+
 
 ////////////////////////////////////////////////////
 // main script
 //
 
-Timer.set(CONFIG.checkInterval, true, EnergyPriceControlMaxPrice);
+//Timer.set(CONFIG.checkInterval, true, EnergyPriceControlMaxPrice);
 
-//EnergyPriceControlMaxPrice();
+EnergyPriceControlMaxPrice();
+
+
+// Shelly.call("Schedule.Create",
+ 
+//   {
+//     //"id": sID, // create own schedule_ID
+//     "enable": true,
+//     "timespec": timeString,
+//     "calls": [
+//         {
+//             "method": "switch.set",
+//             "params": {
+//                 "id": 0,
+//                 "on": switchValue
+//             }
+//         }
+//     ]
+// }
+
+// );
