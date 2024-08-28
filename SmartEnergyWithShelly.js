@@ -9,11 +9,12 @@
 let CONFIG = {
   energyzeroEndpoint: "https://api.energyzero.nl/v1/energyprices",
   //check 2 times a day (every 12h)
-  checkInterval: 6 * 60 * 60 * 1000,
+  checkInterval: 1 * 60 * 60 * 1000,
   maxPrice: 0.08
 };
 
 let scheduleObjectArray = [];
+let scheduleIDsArray = [];
 
 
 /////////////////////////////////////////////////////////
@@ -25,6 +26,14 @@ function AddNumber(currentString, element)
 {
   if (currentString.length > 0) { currentString = currentString + ","};
   return (currentString + element);
+}
+
+//Data persistence in Key-Value-Store
+function kvsSet(key, value) {
+  Shelly.call(
+      "KVS.Set",
+      { "key": key, "value": value }
+  );
 }
 
 
@@ -44,14 +53,20 @@ function getMyEnergyURL(daystimerange) {
   let fromDate = new Date(currentday.getFullYear(),currentday.getMonth(),currentday.getDate(),0,0,0);
   let toDate = new Date(nextday.getFullYear(),nextday.getMonth(),nextday.getDate(),23,0,0);
 
-  return (
+  let fullURL = 
     CONFIG.energyzeroEndpoint +
     "?fromDate=" + 
     fromDate.toISOString() +
     "&tillDate=" +
     toDate.toISOString() +
-    "&interval=4&usageType=1&inclBtw=false"
-  );
+    "&interval=4&usageType=1&inclBtw=false";
+ 
+   kvsSet("SmartEnergyLastURL",fullURL);
+   
+   //Log last run in local time
+   kvsSet("SmartEnergyLastRun",currentday.toUTCString());
+
+  return (fullURL);
 }
 
 //Create new schedule scheme, based on concatenated hours and push in an array
@@ -102,13 +117,28 @@ function CreateScheduleArray(sID,hoursString, daysString,switchValue) {
  function CreateSchedulers() {
 
   //create scheduler  
-  Shelly.call("Schedule.Create",scheduleObjectArray[0]);
+  Shelly.call("Schedule.Create",scheduleObjectArray[0],
+  function (res, err, msg, data) {
+    if (err !== 0) {
+        print("FAILED, ERROR:",0);
+    }
+    else {
+        print("SUCCESS:",res.id);
+
+        //create an array of scheduleIDs and store in KVS
+        scheduleIDsArray.push(res.id); 
+        kvsSet("SmartEnergyScheduleIDs",scheduleIDsArray);  
+        
+    }
+  });
+
   scheduleObjectArray.splice(0,1);
 
-  if (scheduleObjectArray.length > 0){
+  if (scheduleObjectArray.length > 0) {
     Timer.set(1000, false, CreateSchedulers); //recursive to force one by one execution
   }
 
+  
 
  }
 
