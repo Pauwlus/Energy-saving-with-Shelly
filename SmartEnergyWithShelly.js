@@ -9,12 +9,15 @@
 let CONFIG = {
   energyzeroEndpoint: "https://api.energyzero.nl/v1/energyprices",
   //check 2 times a day (every 12h)
-  checkInterval: 1 * 60 * 60 * 1000,
-  maxPrice: 0.08
+  checkInterval: 2 * 60 * 60 * 1000,
+  maxPrice: 0.8,
+  maxPricePerc: 0.8 //max percentage of the average price that day
 };
 
-let scheduleObjectArray = [];
-let scheduleIDsArray = [];
+//let scheduleObjectArray = [];
+//let scheduleIDsArray = [];
+let scheduleObjectArray = new Array;
+let scheduleIDsArray = new Array;
 
 
 /////////////////////////////////////////////////////////
@@ -36,6 +39,12 @@ function kvsSet(key, value) {
   );
 }
 
+function kvsDelete(key) {
+  Shelly.call(
+      "KVS.Delete",
+      { "key": key }
+  );
+}
 
 //Concat EnergyZero URL
 function getMyEnergyURL(daystimerange) {
@@ -111,10 +120,10 @@ function CreateScheduleArray(sID,hoursString, daysString,switchValue) {
   console.log("- Schedule   : " + timeString);
   console.log("- SwitchValue: ", switchValue);
  
- }
+}
 
   //Recursive function, prevents stacking shelly calls problems
- function CreateSchedulers() {
+function CreateSchedulers() {
 
   //create scheduler  
   Shelly.call("Schedule.Create",scheduleObjectArray[0],
@@ -127,8 +136,7 @@ function CreateScheduleArray(sID,hoursString, daysString,switchValue) {
 
         //create an array of scheduleIDs and store in KVS
         scheduleIDsArray.push(res.id); 
-        kvsSet("SmartEnergyScheduleIDs",scheduleIDsArray);  
-        
+        kvsSet("SmartEnergyScheduleIDs",scheduleIDsArray);        
     }
   });
 
@@ -138,9 +146,25 @@ function CreateScheduleArray(sID,hoursString, daysString,switchValue) {
     Timer.set(1000, false, CreateSchedulers); //recursive to force one by one execution
   }
 
-  
+}
 
- }
+//Cleanup old schedules
+function DeleteSchedulers()
+{
+  Shelly.call("Schedule.DeleteAll");
+  
+  scheduleIDsArray.length = 0;
+//  scheduleIDsArray.push(999);
+
+//  kvsSet("SmartEnergyScheduleIDs","");  
+  kvsDelete("SmartEnergyScheduleIDs");  
+
+  print("All old schedules deleted");
+}
+
+
+//Use auto_on_delay on device 0 for max price setting 
+//
 
 // Get energy data and create scheduler
 // - Determine and contcatenate ON/OFF hours based on energy price
@@ -152,11 +176,10 @@ function processHttpResponse(response,error_code,error_message,data) {
   let hoursOFF = "";
   let nextreadingDate = new Date()
   let scheduleObjectArray = [];
+  let scheduleIDsArray = [];
+  let averagePrice = 0;
 
-  //Cleanup old schedules
-  Shelly.call("Schedule.DeleteAll");
-  console.log("All old schedules deleted");
-
+  DeleteSchedulers()  
 
   if (error_code != 0) {
      // process error
@@ -167,6 +190,7 @@ function processHttpResponse(response,error_code,error_message,data) {
     
     // keep date of firste element
     let startreadingDate = new Date(energyData.Prices[0].readingDate); 
+    let averagePrice =  energyData.average;
     
     for (let i = 0; i < energyData.Prices.length; i++) {
 
@@ -186,7 +210,8 @@ function processHttpResponse(response,error_code,error_message,data) {
 
       }
 
-      if (energyData.Prices[i].price <= CONFIG.maxPrice) {
+      //if (energyData.Prices[i].price <= CONFIG.maxPrice) {
+      if ((energyData.Prices[i].price/averagePrice) <= CONFIG.maxPricePerc) {
         let hoursON = AddNumber(hoursON,readingDate.getHours());
 
       } else {
@@ -222,6 +247,6 @@ function EnergyPriceControlMaxPrice() {
 // main script
 //
 
-//Timer.set(CONFIG.checkInterval, true, EnergyPriceControlMaxPrice);
+Timer.set(CONFIG.checkInterval, true, EnergyPriceControlMaxPrice);
 
-EnergyPriceControlMaxPrice();
+//EnergyPriceControlMaxPrice();
