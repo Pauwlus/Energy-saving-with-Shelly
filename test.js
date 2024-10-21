@@ -30,7 +30,7 @@ Shelly.call("Schedule.Create", {
 
 
 //Use auto_on_delay on device 0 for max price setting 
-function GetMaxPriceUserSetting {
+function GetMaxPriceUserSetting() {
     Shelly.call(
     "switch.getconfig",
     {
@@ -42,7 +42,24 @@ function GetMaxPriceUserSetting {
     }
   );
   }
+;
   
-  
-  
+
+
+
+function kvsGet(key) {
+Shelly.call(
+"KVS.Get", { key: "Test"},
+function (result, error_code, error_message, data) {
+    let si =[];
+    if (result) {
+        si = JSON.parse(result);
+        //return si.Value
+    }
+}
+);
+}
+
+
+
   //print ("Max price:", GetMaxPriceUserSetting);

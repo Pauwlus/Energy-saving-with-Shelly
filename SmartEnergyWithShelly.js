@@ -37,14 +37,14 @@ function kvsSet(key, value) {
       "KVS.Set",
       { "key": key, "value": value }
   );
-}
+};
 
 function kvsDelete(key) {
   Shelly.call(
       "KVS.Delete",
       { "key": key }
   );
-}
+};
 
 //Concat EnergyZero URL
 function getMyEnergyURL(daystimerange) {
@@ -76,7 +76,7 @@ function getMyEnergyURL(daystimerange) {
    kvsSet("SmartEnergyLastRun",currentday.toUTCString());
 
   return (fullURL);
-}
+};
 
 //Create new schedule scheme, based on concatenated hours and push in an array
 function CreateScheduleArray(sID,hoursString, daysString,switchValue) {
@@ -120,7 +120,7 @@ function CreateScheduleArray(sID,hoursString, daysString,switchValue) {
   console.log("- Schedule   : " + timeString);
   console.log("- SwitchValue: ", switchValue);
  
-}
+};
 
   //Recursive function, prevents stacking shelly calls problems
 function CreateSchedulers() {
@@ -136,7 +136,7 @@ function CreateSchedulers() {
 
         //create an array of scheduleIDs and store in KVS
         scheduleIDsArray.push(res.id); 
-        kvsSet("SmartEnergyScheduleIDs",scheduleIDsArray);        
+        // kvsSet("SmartEnergyScheduleIDs",scheduleIDsArray);        
     }
   });
 
@@ -146,21 +146,40 @@ function CreateSchedulers() {
     Timer.set(1000, false, CreateSchedulers); //recursive to force one by one execution
   }
 
-}
+};
 
 //Cleanup old schedules
-function DeleteSchedulers()
+function DeleteSchedulers() {
+let dummy = ""
+
+  //delete all schedulers
+  Shelly.call("Schedule.DeleteAll",dummy,
+  function (res, err, msg, data) {
+    if (err !== 0) {
+        print("FAILED, ERROR:",0);
+    }
+    else {
+        print("SUCCESS:",res.id);
+        scheduleIDsArray.length = 0;
+        kvsSet("SmartEnergyScheduleIDs","");        
+    }
+  });
+
+};
+
+//Cleanup old schedules
+function DeleteSchedulers_old()
 {
   Shelly.call("Schedule.DeleteAll");
   
   scheduleIDsArray.length = 0;
 //  scheduleIDsArray.push(999);
 
-//  kvsSet("SmartEnergyScheduleIDs","");  
-  kvsDelete("SmartEnergyScheduleIDs");  
+  kvsSet("SmartEnergyScheduleIDs","");  
+//  kvsDelete("SmartEnergyScheduleIDs");  
 
   print("All old schedules deleted");
-}
+};
 
 
 //Use auto_on_delay on device 0 for max price setting 
@@ -231,7 +250,7 @@ function processHttpResponse(response,error_code,error_message,data) {
     CreateSchedulers();
     
   }
-}
+};
 
 
 function EnergyPriceControlMaxPrice() {
@@ -240,7 +259,7 @@ function EnergyPriceControlMaxPrice() {
   Shelly.call("http.get", { url: getMyEnergyURL(2) },processHttpResponse);
 
 
-}
+};
 
 
 ////////////////////////////////////////////////////
